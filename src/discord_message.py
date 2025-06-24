@@ -1,6 +1,16 @@
 import re
 
 
+# Mensaje de ayuda. Ver si ponerlo en un archivo, así es más fácil de editar.
+def help_message():
+    return ("# Como usar el bot\nUsar el bot es fácil, tenes que mandar un mensaje entre corchetes, y va a hacer una "
+            "busqueda por nombre. Ejemplo:\n\n`[albert]`\n\nSi necesitas ser más especifico con tu busqueda, podes poner "
+            "! al principio para hacer una busqueda exacta. Esto quiere decir que el nombre tiene que estar completo, "
+            "y solo va a devolver una carta. Ejemplo:\n\n`[!fairy]`\n\nEl bot prioriza las cartas del set principal a los "
+            "tokens, entonces buscar [fairy] va a devolver Fairy Tamer, en vez del token si no se usa la busqueda exacta.\n\n-# [Código Fuente](<"
+            "https://github.com/thegamesx/svwb-discord-bot>)")
+
+
 # Separamos la caja de texto en 3: lo normal, la evo y la super evo
 def split_evos(textbox):
     if "<ev>" in textbox or "<sev>" in textbox:
@@ -28,10 +38,10 @@ def strip_html(text_string):
 def prepare_message(card_json, search_items):
     textbox = split_evos(card_json["textbox"])
     msg = f"> ### [{card_json["name"]}](<https://shadowverse-wb.com/en/deck/cardslist/card/?card_id={card_json["card_id"]}>)\n"
-    msg += f"**Clase:** {card_json["class"]}\n**Set:** {card_json["set"]}"
+    msg += f"**Clase:** {card_json["class"]}\n**Set:** {card_json["set"]}\n"
     for item in textbox:
         if item:
-            msg += f"```{item}```"
+            msg += f"```\n{item}\n```"
     if card_json["crest_text"]:
         msg += f"```Crest: {strip_html(card_json["crest_text"])}```"
     if card_json["related_cards"]:

@@ -3,6 +3,7 @@ import json
 with open('json/cardList.json', 'r') as file:
     card_list = json.load(file)
 
+# Probablemente debería usar lo que está en cardList.json. Revisar después
 class_list = {
     0: "Neutral",
     1: "Forestcraft",
@@ -14,7 +15,8 @@ class_list = {
     7: "Portalcraft",
 }
 
-# Algunas cartas tienen otras relacionadas o efectos que no están en el mismo id.
+
+# Algunas cartas tienen otras relacionadas o efectos que no están en el mismo id. Acá buscamos esos datos de ser el caso
 def check_additional_data(card_id):
     if card_id in card_list["data"]["cards"].keys():
         related_cards = card_list["data"]["cards"][card_id]["related_card_ids"]
@@ -31,18 +33,18 @@ def check_additional_data(card_id):
 
 
 def fetch_data_from_id(card_id):
-
-    test = card_list["data"]["card_details"][card_id]["common"]["class"]
     additional_data = check_additional_data(card_id)
     card_data = {
         "card_id": card_list["data"]["card_details"][card_id]["common"]["card_id"],
         "name": card_list["data"]["card_details"][card_id]["common"]["name"],
-        "class": class_list[test],
+        "class": class_list[card_list["data"]["card_details"][card_id]["common"]["class"]],
         "textbox": card_list["data"]["card_details"][card_id]["common"]["skill_text"],
         "flavor": card_list["data"]["card_details"][card_id]["common"]["flavour_text"],
         "image": card_list["data"]["card_details"][card_id]["common"]["card_image_hash"],
-        "evo_image": card_list["data"]["card_details"][card_id]["evo"]["card_image_hash"] if card_list["data"]["card_details"][card_id]["evo"] else "",
-        "set": card_list["data"]["card_set_names"][str(card_list["data"]["card_details"][card_id]["common"]["card_set_id"])],
+        "evo_image": card_list["data"]["card_details"][card_id]["evo"]["card_image_hash"] if
+        card_list["data"]["card_details"][card_id]["evo"] else "",
+        "set": card_list["data"]["card_set_names"][
+            str(card_list["data"]["card_details"][card_id]["common"]["card_set_id"])],
         "related_cards": additional_data["related_cards"],
         "crest_text": additional_data["specific_effect"]["skill_text"] if additional_data["specific_effect"] else "",
     }
