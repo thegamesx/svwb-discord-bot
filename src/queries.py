@@ -1,4 +1,5 @@
 import json
+from .svAPI import call_api
 
 with open('json/cardList.json', 'r') as file:
     card_list = json.load(file)
@@ -33,6 +34,8 @@ def check_additional_data(card_id):
 
 
 def fetch_data_from_id(card_id):
+    card_json = call_api({"card_id": card_id})
+    pass
     additional_data = check_additional_data(card_id)
     card_data = {
         "card_id": card_list["data"]["card_details"][card_id]["common"]["card_id"],
@@ -51,6 +54,19 @@ def fetch_data_from_id(card_id):
     return card_data
 
 
+def search_by_name(params, name):
+    params.update({"free_word": name})
+    return params
+
+
+def search_by_cost(params, cost_list):
+    cost_string = ""
+    for cost in cost_list:
+        cost_string += f"{cost},"
+    params.update({"cost": cost_string[:-1]})
+
+
+"""
 def search_by_name(query):
     results = []
     id_list = card_list["data"]["card_details"].keys()
@@ -64,3 +80,4 @@ def search_by_name(query):
             if query.lower() in card_list["data"]["card_details"][card_id]["common"]["name"].lower():
                 results.append(card_id)
     return results
+"""

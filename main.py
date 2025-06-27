@@ -30,16 +30,21 @@ async def on_message(message):
     if message.author == client.user:
         return
     if message.content.startswith("[") and message.content.endswith("]"):
+        # Despues poner un sistema de logging más completo
+        print(f"Mensaje recibido: {message.content} de {message.author}")
         # El arbol de decisión debería estar en otro lado. Cuando sea más complejo hay que sacarlo de acá
         if message.content[1:-1] == "?":
             await message.channel.send(discord_message.help_message())
         else:
-            search_result = queries.search_by_name(message.content[1:-1])
-            if search_result:
-                data_json = queries.fetch_data_from_id(search_result[0])
-                card_image = svAPI.get_image(data_json["image"])
-                text_message = discord_message.prepare_message(data_json, len(search_result))
-                await message.channel.send(text_message, file=discord.File(card_image))
+            params = {}
+            params = queries.search_by_name(params, message.content[1:-1])
+            if params:
+                search_result = svAPI.call_api(params)
+                if len(search_result["data"]["card_details"]) == 1:
+                    card_id = next(iter(search_result["data"]["card_details"].keys()))
+                    card_image = svAPI.get_image(search_result["data"]["card_details"][card_id]["common"]["card_image_hash"])
+                    text_message = discord_message.prepare_message(search_result["data"]["card_details"][card_id], len(search_result))
+                    await message.channel.send(text_message, file=discord.File(card_image))
                 # Esto manda ambas imagenes, pero no se ve bien completa, asi que por ahora suelo muestro la img base.
                 # evo_image = queries.svAPI(data_json["evo_image"]) if data_json["evo_image"] else None
                 """
