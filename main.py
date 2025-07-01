@@ -1,8 +1,9 @@
 import os
 import discord
+from discord.ext import commands, tasks
 from dotenv import load_dotenv
 from functools import lru_cache
-from src import queries, svAPI, discord_message
+from src import queries, svAPI, discord_message, news, utils
 
 # Configuración
 
@@ -18,11 +19,48 @@ def get_bot_token():
     return os.getenv("BOT_TOKEN")
 
 
+load_dotenv()
+test_channel = os.getenv("NEWS_CHANNEL")
+
+
 # Comandos
+
+@tasks.loop(minutes=2)
+async def check_for_news():
+    news_json = svAPI.get_news()
+    news_to_send = news.checkForNewEntries(news_json)
+    if news_to_send["success"]:
+        channel = client.get_channel(int(test_channel))
+        if news_to_send["data"]:
+            for entry in news_to_send["data"]:
+                try:
+                    news_data = svAPI.get_new_by_id(entry["id"])
+                    #Testeando embed
+                    test_embed = discord.Embed(
+                        title=entry["title"],
+                        description=discord_message.change_html_to_markdown(news_data["data"]["message"]),
+                        url=f"https://shadowverse-wb.com/en/news/detail/?id={entry["id"]}",
+                        color=discord.Color.blue()
+                    )
+                    test_embed.set_footer(text=entry["type_name"])
+                    if entry["image_url"]:
+                        test_embed.set_image(url=entry["image_url"])
+                        await channel.send(embed=test_embed)
+                    else:
+                        news_banner = discord.File("files/news_banner_empty.png", filename="news_banner.png")
+                        test_embed.set_image(url="attachment://news_banner.png")
+                        await channel.send(file=news_banner, embed=test_embed)
+                except Exception as error:
+                    print(f"Error: {error}")
+            news.saveEntries(news_to_send["data"])
+        else:
+            print("No hay noticias")
+
 
 @client.event
 async def on_ready():
     print(f"Estamos online como {client.user}")
+    check_for_news.start()
 
 
 @client.event

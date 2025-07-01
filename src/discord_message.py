@@ -34,6 +34,26 @@ def strip_html(text_string):
     return text_string
 
 
+def change_html_to_markdown(text):
+    text = text.replace("<br>","\n")
+    text = text.replace("&nbsp;", "")
+    text = text.replace("<strong>", "**")
+    text = text.replace("</strong>", "**")
+    text = re.sub(r"<h\d(.*?)>", '## ', text)
+    text = re.sub(r"</h\d>", '\n', text)
+    text = text.replace('</h3>', "\n")
+    text = text.replace('</h5>', "\n")
+    text = text.replace('</div>', "\n")
+    text = strip_html(text)
+    return text
+
+
+def prepare_news_message(news_json):
+    msg = f"### [{news_json["title"]}](<https://shadowverse-wb.com/en/news/detail/?id={news_json["id"]}>)\n"
+    msg += f"-# {news_json["type_name"]}"
+    return msg
+
+
 # Prepara el texto para dejarlo con markdown
 def prepare_message(card_json, search_items):
     textbox = split_evos(card_json["textbox"])
