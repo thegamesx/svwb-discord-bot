@@ -1,4 +1,5 @@
 import re
+import discord
 
 
 # Mensaje de ayuda. Ver si ponerlo en un archivo, así es más fácil de editar.
@@ -37,22 +38,25 @@ def strip_html(text_string):
 def change_html_to_markdown(text):
     text = text.replace("<br>","\n")
     text = text.replace("&nbsp;", "")
+    text = text.replace("&amp;", "&")
     text = text.replace("<strong>", "**")
     text = text.replace("</strong>", "**")
     text = re.sub(r"<h\d(.*?)>", '## ', text)
     text = re.sub(r"</h\d>", '\n', text)
-    text = text.replace('</h3>', "\n")
-    text = text.replace('</h5>', "\n")
     text = text.replace('</div>', "\n")
     text = strip_html(text)
     return text
 
 
-def prepare_news_message(news_json):
-    msg = f"### [{news_json["title"]}](<https://shadowverse-wb.com/en/news/detail/?id={news_json["id"]}>)\n"
-    msg += f"-# {news_json["type_name"]}"
-    return msg
-
+def prepare_news_message(title=None, desc=None, news_id=None, type_name=None):
+    news_embed = discord.Embed(
+        title=title,
+        description=change_html_to_markdown(desc),
+        url=f"https://shadowverse-wb.com/en/news/detail/?id={news_id}",
+        color=discord.Color.blue()
+    )
+    news_embed.set_footer(text=type_name)
+    return news_embed
 
 # Prepara el texto para dejarlo con markdown
 def prepare_message(card_json, search_items):

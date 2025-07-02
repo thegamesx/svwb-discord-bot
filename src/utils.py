@@ -1,6 +1,7 @@
 from urllib.parse import urlparse, urlunparse, quote
 
-# Se encodea la url para transformar carácteres japoneses
+
+# Se encodea la url para transformar carácteres japoneses. Esto asegura que se puedan abrir ciertos links.
 def encode_url_path(url):
     # Parsear la URL en partes
     parsed = urlparse(url)

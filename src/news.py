@@ -57,13 +57,16 @@ def loadFile():
 
 # Este es la función principal, la cual va a devolver nuevas entradas (si las hay) para procesarlas luego
 def checkForNewEntries(news_json):
-    currentEntries = getArticlesID(news_json["data"]["information_list"])
-    savedEntries = loadFile()
+    try:
+        currentEntries = getArticlesID(news_json["data"]["information_list"])
+        savedEntries = loadFile()
 
-    newEntries = [entry for entry in currentEntries if entry not in savedEntries]
-    newEntryList = [loadArticleFromID(entry, news_json["data"]["information_list"]) for entry in newEntries]
+        newEntries = [entry for entry in currentEntries if entry not in savedEntries]
+        newEntryList = [loadArticleFromID(entry, news_json["data"]["information_list"]) for entry in newEntries]
 
-    if newEntryList:
-        return {"success": True, "data": newEntryList[::-1], "error": None}
-    else:
-        return {"success": True, "data": None, "error": None}
+        if newEntryList:
+            return {"success": True, "data": newEntryList[::-1], "error": None}
+        else:
+            return {"success": True, "data": None, "error": None}
+    except Exception as error:
+        return {"success": False, "data": None, "error": error}

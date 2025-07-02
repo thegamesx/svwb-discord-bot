@@ -3,6 +3,8 @@ import urllib.request
 from urllib.parse import urlparse
 import requests
 
+# Configuración de la API
+
 news_api_url = "https://shadowverse-wb.com/web/Information"
 
 headers = {
@@ -19,6 +21,8 @@ headers = {
 }
 
 
+# Se descarga la imagen para después enviarla, pero antes se fija si la había descargado antes.
+# Por ahora no se borran los archivos descargados, pero se podría revisar si esto se vuelve un problema.
 def get_news_image(img_url):
     if img_url:
         if not os.path.exists("temp/"):
