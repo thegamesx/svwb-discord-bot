@@ -1,8 +1,8 @@
 import os
 import discord
+from discord.ext import tasks
 from dotenv import load_dotenv
-from functools import lru_cache
-from src import queries, svAPI, discord_message
+from src import queries, svAPI, discord_message, news
 
 # Configuración
 
@@ -11,18 +11,51 @@ intents.message_content = True
 
 client = discord.Client(intents=intents)
 
-
-@lru_cache()
-def get_bot_token():
-    load_dotenv()
-    return os.getenv("BOT_TOKEN")
+# Se cargan las variables de entorno
+load_dotenv()
+news_channel = os.getenv("NEWS_CHANNEL")
+bot_token = os.getenv("BOT_TOKEN")
 
 
 # Comandos
 
+@tasks.loop(hours=1)
+async def check_for_news():
+    news_json = svAPI.get_news()
+    news_to_send = news.checkForNewEntries(news_json)
+    if news_to_send["success"]:
+        channel = client.get_channel(int(news_channel))
+        if news_to_send["error"]:
+            print(f"Error fetching news: {news_to_send["error"]}")
+        else:
+            if news_to_send["data"]:
+                for entry in news_to_send["data"]:
+                    try:
+                        news_data = svAPI.get_new_by_id(entry["id"])
+                        news_embed = discord_message.prepare_news_message(
+                            title=entry["title"],
+                            desc=news_data["data"]["message"],
+                            news_id=entry["id"],
+                            type_name=entry["type_name"],
+                        )
+                        # Esto se podría poner en una función aparte
+                        if entry["image_url"]:
+                            news_embed.set_image(url=entry["image_url"])
+                            await channel.send(embed=news_embed)
+                        else:
+                            news_banner = discord.File("files/news_banner_empty.png", filename="news_banner.png")
+                            news_embed.set_image(url="attachment://news_banner.png")
+                            await channel.send(file=news_banner, embed=news_embed)
+                        print(f"Se envió {entry["title"]}")
+                    except Exception as error:
+                        print(f"Error: {error}")
+                news.saveEntries(news_to_send["data"])
+
+
 @client.event
 async def on_ready():
     print(f"Estamos online como {client.user}")
+    check_for_news.start()
 
 
 @client.event
@@ -55,4 +88,4 @@ async def on_message(message):
 
 # Arranque del bot
 
-client.run(get_bot_token())
+client.run(bot_token)
