@@ -1,8 +1,20 @@
 import re
 import discord
 
+game_classes = {
+    0: {"name": "Neutral", "icon": "class_neutral.png", "color": discord.Color.light_gray()},
+    1: {"name": "Forest", "icon": "class_elf.png", "color": discord.Color.green()},
+    2: {"name": "Sword", "icon": "class_royal.png", "color": discord.Color.yellow()},
+    3: {"name": "Rune", "icon": "class_witch.png", "color": discord.Color.blurple()},
+    4: {"name": "Dragon", "icon": "class_dragon.png", "color": discord.Color.orange()},
+    5: {"name": "Abyss", "icon": "class_nightmare.png", "color": discord.Color.dark_red()},
+    6: {"name": "Haven", "icon": "class_bishop.png", "color": discord.Color.light_embed()},
+    7: {"name": "Portal", "icon": "class_nemesis.png", "color": discord.Color.blue()},
+}
+
 
 # Mensaje de ayuda. Ver si ponerlo en un archivo, así es más fácil de editar.
+# TODO: Cambiar esto
 def help_message():
     return ("# Como usar el bot\nUsar el bot es fácil, tenes que mandar un mensaje entre corchetes, y va a hacer una "
             "busqueda por nombre. Ejemplo:\n\n`[albert]`\n\nSi necesitas ser más especifico con tu busqueda, podes poner "
@@ -36,7 +48,7 @@ def strip_html(text_string):
 
 
 def change_html_to_markdown(text):
-    text = text.replace("<br>","\n")
+    text = text.replace("<br>", "\n")
     text = text.replace("&nbsp;", "")
     text = text.replace("&amp;", "&")
     text = text.replace("<strong>", "**")
@@ -57,6 +69,26 @@ def prepare_news_message(title=None, desc=None, news_id=None, type_name=None):
     )
     news_embed.set_footer(text=type_name)
     return news_embed
+
+
+def prepare_card_message(
+        card_id=None,
+        card_name=None,
+        textbox=None,
+        faction=None,
+        crest_text=None,
+        related_cards=None,
+):
+    card_embed = discord.Embed(
+        title=card_name,
+        url=f"https://shadowverse-wb.com/en/deck/cardslist/card/?card_id={card_id}",
+        description=f"{game_classes[faction]["name"]}craft",
+        color=game_classes[faction]["color"],
+    )
+    card_embed.set_thumbnail(url=f"attachment://{game_classes[faction]["icon"]}")
+    thumbnail = discord.File(f"files/{game_classes[faction]["icon"]}", filename=game_classes[faction]["icon"])
+    return card_embed, thumbnail
+
 
 # Prepara el texto para dejarlo con markdown
 def prepare_message(card_json, search_items):

@@ -1,11 +1,4 @@
 {
-    "data_headers": {
-        "result_code": 1,
-        "user_id": 0,
-        "user_name": "",
-        "is_login": false,
-        "csrf_token": "f577d87b-2b5b-4f92-b2cd-69892c8c92aa"
-    },
     "data": {
         "cards": {
             "10011110": {

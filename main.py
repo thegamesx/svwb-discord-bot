@@ -1,6 +1,6 @@
 import os
 import discord
-from discord.ext import tasks
+from discord.ext import tasks, commands
 from dotenv import load_dotenv
 from src import queries, svAPI, discord_message, news
 
@@ -10,6 +10,7 @@ intents = discord.Intents.default()
 intents.message_content = True
 
 client = discord.Client(intents=intents)
+tree = discord.app_commands.CommandTree(client)
 
 # Se cargan las variables de entorno
 load_dotenv()
@@ -54,8 +55,42 @@ async def check_for_news():
 
 @client.event
 async def on_ready():
+    await tree.sync()
     print(f"Estamos online como {client.user}")
     check_for_news.start()
+
+
+# noinspection PyUnresolvedReferences
+@tree.command(
+    name="search",
+    description="Busca una carta",
+)
+async def search_card(interaction: discord.Interaction, search_query: str):
+    try:
+        search = svAPI.search_card(svAPI.search_by_name(search_query))
+        if search["status_code"] == 200:
+            # Primero que nada, nos fijamos si se encontró alguna carta
+            if search["data"]["card_details"]:
+                all_card_ids = search["data"]["card_details"].keys()
+                # Separamos los IDs de las cartas y los tokens
+                card_ids = []
+                token_ids = []
+                for card_id in all_card_ids:
+                    token_ids.append(card_id) if search["data"]["card_details"][card_id]["common"]["is_token"] else card_ids.append(card_id)
+                # TODO: Hay que ver que hacer cuando la busqueda devuelve multiples resultados
+                card_embed, thumbnail_file = discord_message.prepare_card_message(
+                    card_id=search["data"]["card_details"][card_ids[0]]["common"]["card_id"],
+                    card_name=search["data"]["card_details"][card_ids[0]]["common"]["name"],
+                    faction=search["data"]["card_details"][card_ids[0]]["common"]["class"],
+                    textbox=search["data"]["card_details"][card_ids[0]]["common"]["skill_text"],
+                )
+                await interaction.response.send_message(embed=card_embed, file=thumbnail_file)
+            else:
+                await interaction.response.send_message(f"-# No se encontraron cartas.", ephemeral=True)
+        else:
+            await interaction.response.send_message(f"Error {search["status_code"]}: {search["error"]}", ephemeral=True)
+    except Exception as e:
+        await interaction.response.send_message(f"Error: {e}", ephemeral=True)
 
 
 @client.event
@@ -84,6 +119,7 @@ async def on_message(message):
             else:
                 await message.channel.send("-# No se encontraron cartas. Puedes ingresar [?] para ver la ayuda (se "
                                            "puede hacer por mensaje privado también)")
+
 
 
 # Arranque del bot
