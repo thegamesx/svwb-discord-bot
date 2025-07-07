@@ -5,6 +5,7 @@ import requests
 
 # Configuración de la API
 
+card_api_url = "https://shadowverse-wb.com/web/CardList"
 news_api_url = "https://shadowverse-wb.com/web/Information"
 
 headers = {
@@ -57,3 +58,26 @@ def get_news():
         return response.json()
     else:
         return {"status_code": response.status_code, "error": f"Error: {response.text}"}
+
+
+def search_card(params):
+    response = requests.get(f"{card_api_url}/cardList?", headers=headers, params=params)
+    if response.ok:
+        return {"status_code": response.status_code, "data": response.json()["data"], "error": None}
+    else:
+        return {"status_code": response.status_code, "error": f"Error: {response.text}", "data": None}
+
+
+def search_by_name(name, params=None):
+    if params is None:
+        params = {}
+    params.update({"free_word": name})
+    return params
+
+
+def search_by_cost(params, cost_list):
+    cost_string = ""
+    for cost in cost_list:
+        cost_string += f"{cost},"
+    params.update({"cost": cost_string[:-1]})
+

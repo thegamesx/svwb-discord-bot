@@ -1,11 +1,4 @@
 {
-  "data_headers": {
-    "result_code": 1,
-    "user_id": 0,
-    "user_name": "",
-    "is_login": false,
-    "csrf_token": "d58a6d39-1ad7-4630-8a11-8fad074314d4"
-  },
   "data": {
     "ability_key_word_list": [
       {
