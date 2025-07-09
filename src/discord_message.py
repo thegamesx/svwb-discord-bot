@@ -36,8 +36,8 @@ def strip_html(text_string):
 
 
 def change_html_to_markdown(text):
-    text = text.replace("<br>","\n")
-    text = text.replace("&nbsp;", "")
+    text = text.replace("<br>", "\n")
+    text = text.replace("&nbsp;", " ")
     text = text.replace("&amp;", "&")
     text = text.replace("<strong>", "**")
     text = text.replace("</strong>", "**")
@@ -57,6 +57,7 @@ def prepare_news_message(title=None, desc=None, news_id=None, type_name=None):
     )
     news_embed.set_footer(text=type_name)
     return news_embed
+
 
 # Prepara el texto para dejarlo con markdown
 def prepare_message(card_json, search_items):
