@@ -35,7 +35,7 @@ def strip_html(text_string):
     return text_string
 
 
-def change_html_to_markdown(text):
+def change_html_to_markdown(text, link=None):
     text = text.replace("<br>", "\n")
     text = text.replace("&nbsp;", " ")
     text = text.replace("&amp;", "&")
@@ -45,13 +45,15 @@ def change_html_to_markdown(text):
     text = re.sub(r"</h\d>", '\n', text)
     text = text.replace('</div>', "\n")
     text = strip_html(text)
+    if len(text) > 4096:
+        text = text[:3900] + f"...\n\nMensaje muy largo. [Ver el resto.](<{link}>)"
     return text
 
 
 def prepare_news_message(title=None, desc=None, news_id=None, type_name=None):
     news_embed = discord.Embed(
         title=title,
-        description=change_html_to_markdown(desc),
+        description=change_html_to_markdown(desc, link=f"https://shadowverse-wb.com/en/news/detail/?id={news_id}"),
         url=f"https://shadowverse-wb.com/en/news/detail/?id={news_id}",
         color=discord.Color.blue()
     )
