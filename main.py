@@ -77,16 +77,24 @@ async def search_card(interaction: discord.Interaction, search_query: str):
                 token_ids = []
                 for card_id in all_card_ids:
                     token_ids.append(card_id) if search["data"]["card_details"][card_id]["common"]["is_token"] else card_ids.append(card_id)
-                # TODO: Hay que ver que hacer cuando la busqueda devuelve multiples resultados
-                card_embed, thumbnail_file = discord_message.prepare_card_message(
-                    card_id=search["data"]["card_details"][card_ids[0]]["common"]["card_id"],
-                    card_name=search["data"]["card_details"][card_ids[0]]["common"]["name"],
-                    faction=search["data"]["card_details"][card_ids[0]]["common"]["class"],
-                    textbox=search["data"]["card_details"][card_ids[0]]["common"]["skill_text"],
-                )
-                await interaction.response.send_message(embed=card_embed, file=thumbnail_file)
+                if len(card_ids) == 1:
+                    # TODO: Hay que ver que hacer cuando la busqueda devuelve multiples resultados
+                    card_embed, thumbnail_file = discord_message.prepare_card_message(
+                        card_id=search["data"]["card_details"][card_ids[0]]["common"]["card_id"],
+                        card_name=search["data"]["card_details"][card_ids[0]]["common"]["name"],
+                        card_type=search["data"]["card_details"][card_ids[0]]["common"]["type"],
+                        faction=search["data"]["card_details"][card_ids[0]]["common"]["class"],
+                        textbox=search["data"]["card_details"][card_ids[0]]["common"]["skill_text"],
+                        img_hash=search["data"]["card_details"][card_ids[0]]["common"]["card_image_hash"],
+                        evo_hash=search["data"]["card_details"][card_ids[0]]["evo"]["card_image_hash"] if search["data"]["card_details"][card_ids[0]]["evo"] else None,
+                    )
+                    await interaction.response.send_message(embed=card_embed, file=thumbnail_file)
+                else:
+                    # Si se encuentran más de una carta, se devuelve una lista para que el usuario elija cual mostrar
+                    view = discord_message.CardSelectView(search["data"]["card_details"])
+                    await interaction.response.send_message(content="🔍 Se encontraron múltiples cartas. Elegí una:", view=view, ephemeral=True)
             else:
-                await interaction.response.send_message(f"-# No se encontraron cartas.", ephemeral=True)
+                await interaction.response.send_message(f"-#❌ No se encontraron cartas.", ephemeral=True)
         else:
             await interaction.response.send_message(f"Error {search["status_code"]}: {search["error"]}", ephemeral=True)
     except Exception as e:
