@@ -1,6 +1,7 @@
 import re
 import discord
 from discord.ui import Select, View, Button
+from .svAPI import make_card_dict_from_data
 
 # TODO: Poner en un json aparte, en un archivo.
 game_classes = {
@@ -28,31 +29,13 @@ rarity_list = {
     4: "Legendary",
 }
 
-# TODO: Temp. Usar el que viene en la query.
-traits_list = {
-    "0": "-",
-    "2": "Officer",
-    "3": "Luminous",
-    "4": "Levin",
-    "5": "Pixie",
-    "6": "Departed",
-    "8": "Earth Sigil",
-    "11": "Mysteria",
-    "12": "Golem",
-    "13": "Shikigami",
-    "14": "Artifact",
-    "15": "Puppetry",
-    "17": "Marine",
-    "20": "Anathema"
-}
-
 
 # ---- Select dinámico que se genera con las cartas encontradas ----
 class CardSelect(Select):
     def __init__(self, card_data: dict):
         self.card_data = card_data
         options = []
-        for card_id, card in card_data.items():
+        for card_id, card in card_data["card_details"].items():
             if card["common"]["is_token"]:
                 continue  # ignorar tokens
             name = card["common"]["name"]
@@ -62,19 +45,11 @@ class CardSelect(Select):
         super().__init__(placeholder="Selecciona una carta...", options=options)
 
     async def callback(self, interaction: discord.Interaction):
-        #TODO: Ver que esto pueda devolver info del crest y cartas relacionadas. Y arreglarlo en general, no anda bien
         selected_id = self.values[0]
-        selected_card = self.card_data[selected_id]
-        embed, file = prepare_card_message(
-            card_id=selected_card["common"]["card_id"],
-            card_name=selected_card["common"]["name"],
-            card_type=selected_card["common"]["type"],
-            faction=selected_card["common"]["class"],
-            textbox=selected_card["common"]["skill_text"],
-            img_url=selected_card["common"]["card_image_hash"],
-            evo_url=selected_card["evo"]["card_image_hash"] if selected_card["evo"] else None,
-        )
-        await interaction.response.send_message(embed=embed, file=file)
+        data_json = self.card_data
+        card_json = make_card_dict_from_data(data_json, selected_id)
+        embed, file, view = prepare_card_message(card_json)
+        await interaction.response.send_message(embed=embed, file=file, view=view)
 
 
 # ---- View que contiene el Select ----
@@ -111,31 +86,32 @@ class CardExtrasView(View):
             related_button.callback = self.send_related_cards
             self.add_item(related_button)
 
-
     async def send_related_cards(self, interaction: discord.Interaction):
-        try:
-            # TODO: Armá el contenido del mensaje con la info de related_cards
-            """
-            card_list = "\n".join(
-                [f"• {card['name']} (ID: {card['card_id']})" for card in self.related_cards]
-            )
-            """
-            await interaction.response.send_message(f"Cartas relacionadas: {self.related_cards}", ephemeral=True)
-
-        except discord.Forbidden:
-            await interaction.response.send_message("❌ No pude enviarte un mensaje privado. Verificá tu configuración de privacidad.", ephemeral=True)
-
+        # La función devuelve el embed, thumbnail y view juntos. Aca no vamos a usar el view por ahora, asi que
+        # lo ignoramos. Después suponemos que el thumbnail va a ser igual para todos los embeds, asi que solo
+        # uso el primero. Hay que ver como hacer si tienen que ser diferentes.
+        related_cards_embeds = [prepare_card_message(related_card) for related_card in self.related_cards]
+        if len(related_cards_embeds) == 1:
+            await interaction.response.send_message(embed=related_cards_embeds[0][0], file=related_cards_embeds[0][1],
+                                                    ephemeral=True)
+        else:
+            related_cards_embeds_temp = [embed[0] for embed in related_cards_embeds]
+            await interaction.response.send_message(embeds=related_cards_embeds_temp, file=related_cards_embeds[0][1],
+                                                    ephemeral=True)
 
     async def send_card_art(self, interaction: discord.Interaction):
         # TODO: Ver excepciones
+        embed_normal = discord.Embed(title="")
+        embed_normal.set_image(url=self.card_img_url)
         if self.evo_img_url:
+            embed_evo = discord.Embed(title="Evolución")
+            embed_evo.set_image(url=self.evo_img_url)
             await interaction.response.send_message(
-                files=[discord.File(self.card_img_url), discord.File(self.evo_img_url)],
+                embeds=[embed_normal, embed_evo],
                 ephemeral=True
             )
         else:
-            await interaction.response.send_message(file=discord.File(self.card_img_url), ephemeral=True)
-
+            await interaction.response.send_message(embed=embed_normal, ephemeral=True)
 
 
 # Mensaje de ayuda. Ver si ponerlo en un archivo, así es más fácil de editar.
@@ -202,70 +178,41 @@ def prepare_news_message(title=None, desc=None, news_id=None, type_name=None):
     return news_embed
 
 
-def prepare_card_message(
-        card_id=None,
-        card_name=None,
-        card_type=None,
-        card_set_name=None,
-        pp_cost=None,
-        textbox=None,
-        attack=None,
-        rarity=None,
-        life=None,
-        faction=None,
-        crest_text=None,
-        traits=None,
-        related_cards=None,
-        img_url=None,
-        evo_url=None,
-):
+def prepare_card_message(card_json):
+    if card_json["is_token"]:
+        description = f"{game_classes[card_json["faction"]]["name"]}craft ({rarity_list[card_json["rarity"]]})"
+    else:
+        description = (f"{game_classes[card_json["faction"]]["name"]}craft ({rarity_list[card_json["rarity"]]})\n"
+                       f"Set: {card_json["card_set_name"]}")
     card_embed = discord.Embed(
-        title=card_name,
-        url=f"https://shadowverse-wb.com/en/deck/cardslist/card/?card_id={card_id}",
-        description=f"{game_classes[faction]["name"]}craft ({rarity_list[rarity]})\nSet: {card_set_name}",
-        color=game_classes[faction]["color"],
+        title=card_json["card_name"],
+        url=f"https://shadowverse-wb.com/en/deck/cardslist/card/?card_id={card_json["card_id"]}",
+        description=description,
+        color=game_classes[card_json["faction"]]["color"],
     )
-    card_embed.set_thumbnail(url=f"attachment://{game_classes[faction]["icon"]}")
-    textbox_split = split_evos(textbox)
-    if traits != [0]:
-        # TODO: Luego hacer que pueda mostrar mas de un trait
-        card_embed.add_field(name="", value=f"{traits_list[str(traits[0])]} {type_list[card_type]}", inline=False)
+    card_embed.set_thumbnail(url=f"attachment://{game_classes[card_json["faction"]]["icon"]}")
+    textbox_split = split_evos(card_json["textbox"])
+    if card_json["is_token"]:
+        type_text = f"{card_json["traits"]}{type_list[card_json["card_type"]]} Token"
     else:
-        card_embed.add_field(name="", value=f"{type_list[card_type]}", inline=False)
-    if not (attack == 0 and life == 0):
-        card_embed.add_field(name="", value=f"{pp_cost}PP {attack}/{life}", inline=False)
+        type_text = f"{card_json["traits"]}{type_list[card_json["card_type"]]}"
+    card_embed.add_field(name="", value=type_text, inline=False)
+    if not (card_json["attack"] == 0 and card_json["life"] == 0):
+        card_embed.add_field(name="", value=f"{card_json["pp_cost"]}PP {card_json["attack"]}/{card_json["life"]}",
+                             inline=False)
     else:
-        card_embed.add_field(name="", value=f"{pp_cost}PP", inline=False)
+        card_embed.add_field(name="", value=f"{card_json["pp_cost"]}PP", inline=False)
     for ability_text in textbox_split.keys():
         if textbox_split[ability_text]:
             card_embed.add_field(name="", value=textbox_split[ability_text], inline=False)
-    if crest_text:
-        card_embed.add_field(name="Crest", value=change_html_to_markdown(crest_text), inline=False)
+    if card_json["crest_text"]:
+        card_embed.add_field(name="Crest", value=change_html_to_markdown(card_json["crest_text"]), inline=False)
 
     # Agregamos botones para ver el arte de la carta y sus cartas relacionadas (si hay)
-    view = CardExtrasView(img_url, evo_url, related_cards=related_cards)
+    view = CardExtrasView(card_json["img_url"], card_json["evo_url"], related_cards=card_json["related_cards"])
 
-    #card_embed.set_image(url=f"https://shadowverse-wb.com/uploads/card_image/eng/card/{img_hash}.png")
-    thumbnail = discord.File(f"files/{game_classes[faction]["icon"]}", filename=game_classes[faction]["icon"])
+    thumbnail = discord.File(
+        f"files/{game_classes[card_json["faction"]]["icon"]}",
+        filename=game_classes[card_json["faction"]]["icon"]
+    )
     return card_embed, thumbnail, view
-
-
-# Prepara el texto para dejarlo con markdown
-def prepare_message(card_json, search_items):
-    textbox = split_evos(card_json["textbox"])
-    msg = f"> ### [{card_json["name"]}](<https://shadowverse-wb.com/en/deck/cardslist/card/?card_id={card_json["card_id"]}>)\n"
-    msg += f"**Clase:** {card_json["class"]}\n**Set:** {card_json["set"]}\n"
-    for item in textbox:
-        if item:
-            msg += f"```\n{item}\n```"
-    if card_json["crest_text"]:
-        msg += f"```Crest: {strip_html(card_json["crest_text"])}```"
-    if card_json["related_cards"]:
-        msg += "_Cartas relacionadas: "
-        for card in card_json["related_cards"]:
-            msg += f"{card}, "
-        msg = msg[:-2]
-        msg += "_"
-    if search_items > 1:
-        msg += f"\n-# Se encontraron {search_items} cartas. Prueba siendo más especifico si no es la carta que buscas."
-    return msg
