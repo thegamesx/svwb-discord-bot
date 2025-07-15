@@ -66,7 +66,6 @@ async def on_ready():
     check_for_news.start()
 
 
-# noinspection PyUnresolvedReferences
 @tree.command(
     name="card",
     description="Busca una carta",
@@ -87,9 +86,10 @@ async def search_card(interaction: discord.Interaction, search_name: str):
                 if len(card_ids) == 1:
                     card_details = svAPI.make_card_dict_from_data(search["data"], card_ids[0])
                     card_embed, thumbnail_file, related_cards_view = discord_message.prepare_card_message(card_details)
-
                     await interaction.response.send_message(embed=card_embed, file=thumbnail_file,
                                                             view=related_cards_view)
+                    # Asignamos el mensaje original para que View lo pueda editar en el timeout
+                    related_cards_view.message = await interaction.original_response()
                 else:
                     # Si se encuentran más de una carta, se devuelve una lista para que el usuario elija cuál mostrar
                     view = discord_message.CardSelectView(search["data"], card_ids)
@@ -98,6 +98,7 @@ async def search_card(interaction: discord.Interaction, search_name: str):
                         view=view,
                         ephemeral=True
                     )
+                    view.message = await interaction.original_response()
             else:
                 await interaction.response.send_message(f"-# ❌ No se encontraron cartas.", ephemeral=True)
         else:
@@ -128,6 +129,7 @@ async def search_token(interaction: discord.Interaction, search_name: str):
 
                     await interaction.response.send_message(embed=card_embed, file=thumbnail_file,
                                                             view=related_cards_view)
+                    related_cards_view.message = await interaction.original_response()
                 else:
                     # Si se encuentran más de una carta, se devuelve una lista para que el usuario elija cuál mostrar
                     view = discord_message.CardSelectView(search["data"], token_ids)
@@ -136,6 +138,7 @@ async def search_token(interaction: discord.Interaction, search_name: str):
                         view=view,
                         ephemeral=True
                     )
+                    view.message = await interaction.original_response()
             else:
                 await interaction.response.send_message(f"-# ❌ No se encontraron tokens.", ephemeral=True)
         else:
@@ -192,6 +195,7 @@ async def search_art(
                         view=view,
                         ephemeral=True
                     )
+                    view.message = await interaction.original_response()
             else:
                 await interaction.response.send_message(f"-# ❌ No se encontraron tokens.", ephemeral=True)
         else:

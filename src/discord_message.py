@@ -43,6 +43,7 @@ class CardSelect(Select):
         self.list_of_ids = list_of_ids
         self.only_show_art = only_show_art
         self.include_evo_art = include_evo_art
+
         options = []
         for card_id in list_of_ids:
             options.append(
@@ -70,6 +71,7 @@ class CardSelect(Select):
             card_json = make_card_dict_from_data(data_json, selected_id)
             embed, file, view = prepare_card_message(card_json)
             await interaction.response.send_message(embed=embed, file=file, view=view)
+            view.message = await interaction.original_response()
 
 
 # ---- View que contiene el Select ----
@@ -81,22 +83,36 @@ class CardSelectView(View):
             only_show_art:bool = False,
             include_evo_art: bool = False
     ):
-        super().__init__(timeout=120)  # se desactiva luego de 120s
+        super().__init__(timeout=300)  # se desactiva luego de 5m
         self.add_item(CardSelect(
             card_data,
             list_of_ids,
             only_show_art=only_show_art,
             include_evo_art=include_evo_art,
         ))
+        self.message = None
+
+    async def on_timeout(self) -> None:
+        print("Deshabilitando select")
+        for item in self.children:
+            item.disabled = True
+
+        if self.message:
+            try:
+                await self.message.edit(content="⌛ Esta busqueda ha expirado.",view=self)
+                print("Select deshabilitado por timeout")
+            except Exception as e:
+                print(f"No se pudo editar el mensaje tras timeout: {e}")
 
 
 # Creamos un botón que mande las cartas relacionadas por privado
 class CardExtrasView(View):
     def __init__(self, card_hash, evo_hash, related_cards=None):
-        super().__init__(timeout=60)
+        super().__init__(timeout=300)
         self.related_cards = related_cards
         self.card_hash = card_hash
         self.evo_hash = evo_hash
+        self.message = None
 
         # Botón para ver el arte de una carta
         art_button = Button(
@@ -116,6 +132,17 @@ class CardExtrasView(View):
             )
             related_button.callback = self.send_related_cards
             self.add_item(related_button)
+
+    async def on_timeout(self):
+        print("Deshabilitando botones")
+        for item in self.children:
+            item.disabled = True
+        if self.message:
+            try:
+                await self.message.edit(view=self)
+                print("Botones deshabilitados por timeout")
+            except Exception as e:
+                print(f"Error al editar mensaje tras timeout: {e}")
 
     async def send_related_cards(self, interaction: discord.Interaction):
         # La función devuelve el embed, thumbnail y view juntos. Aca no vamos a usar el view por ahora, asi que
