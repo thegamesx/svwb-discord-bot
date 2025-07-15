@@ -1,10 +1,11 @@
 import os
 import urllib.request
 from urllib.parse import urlparse
-import requests
+import aiohttp
 
 # Configuración de la API
 
+card_api_url = "https://shadowverse-wb.com/web/CardList"
 news_api_url = "https://shadowverse-wb.com/web/Information"
 
 headers = {
@@ -43,17 +44,102 @@ def get_image(card_hash):
     return localPath
 
 
-def get_new_by_id(news_id):
-    response = requests.get(f"{news_api_url}/detail?id={news_id}", headers=headers)
-    if response.ok:
-        return response.json()
-    else:
-        return {"status_code": response.status_code, "error": f"Error: {response.text}"}
+async def get_new_by_id(news_id):
+    async with aiohttp.ClientSession() as session:
+        async with session.get(f"{news_api_url}/detail?id={news_id}", headers=headers) as response:
+            if response.status == 200:
+                return await response.json()
+            return {"status_code": response.status, "error": f"Error: {await response.text()}"}
 
 
-def get_news():
-    response = requests.get(news_api_url, headers=headers)
-    if response.ok:
-        return response.json()
+async def get_news():
+    async with aiohttp.ClientSession() as session:
+        async with session.get(news_api_url, headers=headers) as response:
+            if response.status == 200:
+                return await response.json()
+            return {"status_code": response.status, "error": f"Error: {await response.text()}"}
+
+
+async def search_card(params):
+    async with aiohttp.ClientSession() as session:
+        async with session.get(f"{card_api_url}/cardList", headers=headers, params=params) as response:
+            if response.status == 200:
+                json_data = await response.json()
+                return {
+                    "status_code": response.status,
+                    "data": json_data["data"],
+                    "error": None
+                }
+            return {
+                "status_code": response.status,
+                "data": None,
+                "error": f"Error: {await response.text()}"
+            }
+
+
+def search_by_name(name, params=None):
+    if params is None:
+        params = {}
+    params.update({"free_word": name})
+    return params
+
+
+def search_by_cost(params, cost_list):
+    cost_string = ""
+    for cost in cost_list:
+        cost_string += f"{cost},"
+    params.update({"cost": cost_string[:-1]})
+
+
+def make_card_dict_from_data(card_json, card_id):
+    card_id = str(card_id)  # Forzamos str, tira error si es int
+    crest_text = None
+    related_cards = []
+    if card_json["card_details"][card_id]["common"]["is_token"]:
+        is_token = True
+        set_name = None
     else:
-        return {"status_code": response.status_code, "error": f"Error: {response.text}"}
+        is_token = False
+        set_id = card_json["card_details"][card_id]["common"]["card_set_id"]
+        set_name = card_json['card_set_names'][str(set_id)]
+    if card_json["cards"]:
+        if card_id in card_json["cards"].keys():
+            specific_effects = card_json["cards"][card_id]["specific_effect_card_ids"]
+            # Por ahora no hay carta que tenga más de un efecto específico. Revisar esto si eso llegue a cambiar
+            if specific_effects:
+                crest_text = card_json["specific_effect_card_info"][str(specific_effects[0])]["skill_text"]
+            if not is_token:
+                for related_card_id in card_json["cards"][card_id]['related_card_ids']:
+                    # Hay que especificar que es un token en la recursion, asi evitamos una recursion infinita
+                    related_cards.append(make_card_dict_from_data(card_json, related_card_id))
+    trait_text = ""
+    for trait in card_json["card_details"][card_id]["common"]["tribes"]:
+        if trait != 0:
+            trait_text += card_json["tribe_names"][str(trait)] + " "
+    return {
+        "card_id": card_json["card_details"][card_id]["common"]["card_id"],
+        "card_name": card_json["card_details"][card_id]["common"]["name"],
+        "card_type": card_json["card_details"][card_id]["common"]["type"],
+        "card_set_name": set_name,
+        "attack": card_json["card_details"][card_id]["common"]["atk"],
+        "life": card_json["card_details"][card_id]["common"]["life"],
+        "pp_cost": card_json["card_details"][card_id]["common"]["cost"],
+        "rarity": card_json["card_details"][card_id]["common"]["rarity"],
+        "faction": card_json["card_details"][card_id]["common"]["class"],
+        "textbox": card_json["card_details"][card_id]["common"]["skill_text"],
+        "img_hash": card_json["card_details"][card_id]["common"]["card_image_hash"],
+        "evo_hash": card_json["card_details"][card_id]["evo"]["card_image_hash"] if
+        card_json["card_details"][card_id]["evo"] else None,
+        "traits": trait_text,
+        "crest_text": crest_text,
+        "related_cards": related_cards,
+        "is_token": is_token,
+    }
+
+
+def retrieve_art_hash(data_json, card_id):
+    return {
+        "img_hash": data_json["card_details"][card_id]["common"]["card_image_hash"],
+        "evo_hash": data_json["card_details"][card_id]["evo"]["card_image_hash"] if
+        data_json["card_details"][card_id]["evo"] else None
+    }
