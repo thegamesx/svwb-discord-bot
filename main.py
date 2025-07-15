@@ -29,10 +29,12 @@ async def check_for_news():
         if news_to_send["error"]:
             print(f"Error fetching news: {news_to_send["error"]}")
         else:
-            if news_to_send["data"]:
-                for entry in news_to_send["data"]:
+            entries = news_to_send["data"]
+            if entries:
+                errors = []
+                for index, entry in enumerate(entries):
                     try:
-                        news_data = svAPI.get_new_by_id(entry["id"])
+                        news_data = await svAPI.get_new_by_id(entry["id"])
                         news_embed = discord_message.prepare_news_message(
                             title=entry["title"],
                             desc=news_data["data"]["message"],
@@ -50,8 +52,11 @@ async def check_for_news():
                         print(f"Se envió {entry["title"]}")
                     except Exception as error:
                         print(f"Error: {error}")
-                # TODO: No guardar los que tuvieron error
-                news.saveEntries(news_to_send["data"])
+                        errors.append(index)
+                if errors:
+                    # Elimino de la lista los artículos que no se enviaron
+                    entries[:] = [entry for index, entry in enumerate(entries) if index not in errors]
+                news.saveEntries(entries)
 
 
 @client.event
