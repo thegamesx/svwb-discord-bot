@@ -1,7 +1,7 @@
 import re
 import discord
 from discord.ui import Select, View, Button
-from .svAPI import make_card_dict_from_data
+from .svAPI import make_card_dict_from_data, retrieve_art_hash
 
 # TODO: Poner en un json aparte, en un archivo.
 game_classes = {
@@ -32,14 +32,23 @@ rarity_list = {
 
 # ---- Select dinámico que se genera con las cartas encontradas ----
 class CardSelect(Select):
-    def __init__(self, card_data: dict):
+    def __init__(
+            self,
+            card_data: dict,
+            list_of_ids: list,
+            only_show_art: bool = False,
+            include_evo_art: bool = False
+    ):
         self.card_data = card_data
+        self.list_of_ids = list_of_ids
+        self.only_show_art = only_show_art
+        self.include_evo_art = include_evo_art
         options = []
-        for card_id, card in card_data["card_details"].items():
-            if card["common"]["is_token"]:
-                continue  # ignorar tokens
-            name = card["common"]["name"]
-            options.append(discord.SelectOption(label=name, value=card_id))
+        for card_id in list_of_ids:
+            options.append(
+                discord.SelectOption(label=card_data["card_details"][card_id]["common"]["name"],
+                                     value=card_id)
+            )
         if len(options) > 25:
             options = options[:25]
         super().__init__(placeholder="Selecciona una carta...", options=options)
@@ -47,25 +56,47 @@ class CardSelect(Select):
     async def callback(self, interaction: discord.Interaction):
         selected_id = self.values[0]
         data_json = self.card_data
-        card_json = make_card_dict_from_data(data_json, selected_id)
-        embed, file, view = prepare_card_message(card_json)
-        await interaction.response.send_message(embed=embed, file=file, view=view)
+        if self.only_show_art:
+            art_hash = retrieve_art_hash(data_json, selected_id)
+            embed_normal = get_imgs_embed(art_hash["img_hash"])
+            if art_hash["evo_hash"] and self.include_evo_art:
+                embed_evo = get_imgs_embed(art_hash["evo_hash"], title="Evolución")
+                await interaction.response.send_message(
+                    embeds=[embed_normal, embed_evo]
+                )
+            else:
+                await interaction.response.send_message(embed=embed_normal)
+        else:
+            card_json = make_card_dict_from_data(data_json, selected_id)
+            embed, file, view = prepare_card_message(card_json)
+            await interaction.response.send_message(embed=embed, file=file, view=view)
 
 
 # ---- View que contiene el Select ----
 class CardSelectView(View):
-    def __init__(self, card_data: dict):
+    def __init__(
+            self,
+            card_data: dict,
+            list_of_ids: list,
+            only_show_art:bool = False,
+            include_evo_art: bool = False
+    ):
         super().__init__(timeout=120)  # se desactiva luego de 120s
-        self.add_item(CardSelect(card_data))
+        self.add_item(CardSelect(
+            card_data,
+            list_of_ids,
+            only_show_art=only_show_art,
+            include_evo_art=include_evo_art,
+        ))
 
 
-# Creamos un boton que mande las cartas relacionadas por privado
+# Creamos un botón que mande las cartas relacionadas por privado
 class CardExtrasView(View):
-    def __init__(self, card_img_url, evo_img_url, related_cards=None):
+    def __init__(self, card_hash, evo_hash, related_cards=None):
         super().__init__(timeout=60)
         self.related_cards = related_cards
-        self.card_img_url = card_img_url
-        self.evo_img_url = evo_img_url
+        self.card_hash = card_hash
+        self.evo_hash = evo_hash
 
         # Botón para ver el arte de una carta
         art_button = Button(
@@ -101,11 +132,9 @@ class CardExtrasView(View):
 
     async def send_card_art(self, interaction: discord.Interaction):
         # TODO: Ver excepciones
-        embed_normal = discord.Embed(title="")
-        embed_normal.set_image(url=self.card_img_url)
-        if self.evo_img_url:
-            embed_evo = discord.Embed(title="Evolución")
-            embed_evo.set_image(url=self.evo_img_url)
+        embed_normal = get_imgs_embed(self.card_hash)
+        if self.evo_hash:
+            embed_evo = get_imgs_embed(self.evo_hash, title="Evolución")
             await interaction.response.send_message(
                 embeds=[embed_normal, embed_evo],
                 ephemeral=True
@@ -114,15 +143,49 @@ class CardExtrasView(View):
             await interaction.response.send_message(embed=embed_normal, ephemeral=True)
 
 
-# Mensaje de ayuda. Ver si ponerlo en un archivo, así es más fácil de editar.
-# TODO: Cambiar esto
+# Mensaje de ayuda.
 def help_message():
-    return ("# Como usar el bot\nUsar el bot es fácil, tenes que mandar un mensaje entre corchetes, y va a hacer una "
-            "busqueda por nombre. Ejemplo:\n\n`[albert]`\n\nSi necesitas ser más especifico con tu busqueda, podes poner "
-            "! al principio para hacer una busqueda exacta. Esto quiere decir que el nombre tiene que estar completo, "
-            "y solo va a devolver una carta. Ejemplo:\n\n`[!fairy]`\n\nEl bot prioriza las cartas del set principal a los "
-            "tokens, entonces buscar [fairy] va a devolver Fairy Tamer, en vez del token si no se usa la busqueda exacta.\n\n-# [Código Fuente](<"
-            "https://github.com/thegamesx/svwb-discord-bot>)")
+    embed = discord.Embed(
+        title="📘 Guía de comandos de SVBW Bot",
+        description="Acá tenés una lista de los comandos disponibles.",
+        color=discord.Color.blurple()
+    )
+
+    embed.add_field(
+        name="/card [nombre]",
+        value="Busca una carta por nombre. Si hay más de una coincidencia, podrás elegir cuál ver.\n"
+              "Al mostrar la info de la carta, tambien van a aparecer botones para ver el arte y cartas relacionadas "
+              "(si las hay).\n"
+              "Nota: Si la busqueda devuelve más de 25 resultados, solo van a aparecer los primeros 25, debido a una "
+              "limitación de Discord. Si tu carta no aparece, prueba siendo un poco más especifico.",
+        inline=False
+    )
+
+    embed.add_field(
+        name="/token [nombre]",
+        value="Lo mismo de arriba, pero solo muestra tokens. Podes usar el nombre de la carta que lo genera para buscar"
+              " (por ejemplo, si buscas Orchis te van a salir Enhanced Puppet y Lloyd como opción para elegir).",
+        inline=False
+    )
+
+    embed.add_field(
+        name="/art [nombre]",
+        value="Busca una carta por nombre, y muestra solo su arte. Este comando tiene dos opciones:\n"
+              "- include_evo: Si es True, también muestra el arte de su evolución (si tiene)\n"
+              "- include_tokens: Si es True, los tokens van a aparecer en la búsqueda. "
+              "Se puede combinar con el comando de arriba.",
+        inline=False
+    )
+
+    embed.add_field(
+        name="",
+        value="[Código Fuente](https://github.com/thegamesx/svwb-discord-bot)",
+        inline=False
+    )
+
+    embed.set_footer(text="SVWB LA Bot")
+
+    return embed
 
 
 # Separamos la caja de texto en 3: lo normal, la evo y la super evo
@@ -196,12 +259,12 @@ def prepare_card_message(card_json):
         type_text = f"{card_json["traits"]}{type_list[card_json["card_type"]]} Token"
     else:
         type_text = f"{card_json["traits"]}{type_list[card_json["card_type"]]}"
-    card_embed.add_field(name="", value=type_text, inline=False)
     if not (card_json["attack"] == 0 and card_json["life"] == 0):
-        card_embed.add_field(name="", value=f"{card_json["pp_cost"]}PP {card_json["attack"]}/{card_json["life"]}",
+        card_embed.add_field(name="",
+                             value=f"{type_text}\n{card_json["pp_cost"]}PP {card_json["attack"]}/{card_json["life"]}",
                              inline=False)
     else:
-        card_embed.add_field(name="", value=f"{card_json["pp_cost"]}PP", inline=False)
+        card_embed.add_field(name="", value=f"{type_text}\n{card_json["pp_cost"]}PP", inline=False)
     for ability_text in textbox_split.keys():
         if textbox_split[ability_text]:
             card_embed.add_field(name="", value=textbox_split[ability_text], inline=False)
@@ -209,10 +272,18 @@ def prepare_card_message(card_json):
         card_embed.add_field(name="Crest", value=change_html_to_markdown(card_json["crest_text"]), inline=False)
 
     # Agregamos botones para ver el arte de la carta y sus cartas relacionadas (si hay)
-    view = CardExtrasView(card_json["img_url"], card_json["evo_url"], related_cards=card_json["related_cards"])
+    view = CardExtrasView(card_json["img_hash"], card_json["evo_hash"], related_cards=card_json["related_cards"])
 
     thumbnail = discord.File(
         f"files/{game_classes[card_json["faction"]]["icon"]}",
         filename=game_classes[card_json["faction"]]["icon"]
     )
+
     return card_embed, thumbnail, view
+
+
+def get_imgs_embed(card_hash, title=""):
+    card_url = f"https://shadowverse-wb.com/uploads/card_image/eng/card/{card_hash}.png"
+    embed_art = discord.Embed(title=title)
+    embed_art.set_image(url=card_url)
+    return embed_art

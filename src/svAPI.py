@@ -92,7 +92,7 @@ def search_by_cost(params, cost_list):
 
 
 def make_card_dict_from_data(card_json, card_id):
-    card_id = str(card_id) # Forzamos str, tira error si es int
+    card_id = str(card_id)  # Forzamos str, tira error si es int
     crest_text = None
     related_cards = []
     if card_json["card_details"][card_id]["common"]["is_token"]:
@@ -111,7 +111,7 @@ def make_card_dict_from_data(card_json, card_id):
             if not is_token:
                 for related_card_id in card_json["cards"][card_id]['related_card_ids']:
                     # Hay que especificar que es un token en la recursion, asi evitamos una recursion infinita
-                    related_cards.append(make_card_dict_from_data(card_json,related_card_id))
+                    related_cards.append(make_card_dict_from_data(card_json, related_card_id))
     trait_text = ""
     for trait in card_json["card_details"][card_id]["common"]["tribes"]:
         if trait != 0:
@@ -127,11 +127,19 @@ def make_card_dict_from_data(card_json, card_id):
         "rarity": card_json["card_details"][card_id]["common"]["rarity"],
         "faction": card_json["card_details"][card_id]["common"]["class"],
         "textbox": card_json["card_details"][card_id]["common"]["skill_text"],
-        "img_url": f"https://shadowverse-wb.com/uploads/card_image/eng/card/{card_json["card_details"][card_id]["common"]["card_image_hash"]}.png",
-        "evo_url": f"https://shadowverse-wb.com/uploads/card_image/eng/card/{card_json["card_details"][card_id]["evo"]["card_image_hash"]}.png" if
+        "img_hash": card_json["card_details"][card_id]["common"]["card_image_hash"],
+        "evo_hash": card_json["card_details"][card_id]["evo"]["card_image_hash"] if
         card_json["card_details"][card_id]["evo"] else None,
         "traits": trait_text,
         "crest_text": crest_text,
         "related_cards": related_cards,
         "is_token": is_token,
+    }
+
+
+def retrieve_art_hash(data_json, card_id):
+    return {
+        "img_hash": data_json["card_details"][card_id]["common"]["card_image_hash"],
+        "evo_hash": data_json["card_details"][card_id]["evo"]["card_image_hash"] if
+        data_json["card_details"][card_id]["evo"] else None
     }
