@@ -50,6 +50,7 @@ async def check_for_news():
                         print(f"Se envió {entry["title"]}")
                     except Exception as error:
                         print(f"Error: {error}")
+                # TODO: No guardar los que tuvieron error
                 news.saveEntries(news_to_send["data"])
 
 
