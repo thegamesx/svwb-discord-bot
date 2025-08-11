@@ -251,8 +251,9 @@ def change_html_to_markdown(text, link=None):
     text = text.replace("&amp;", "&")
     text = text.replace("<strong>", "**")
     text = text.replace("</strong>", "**")
-    text = re.sub(r"<h\d(.*?)>", '## ', text)
+    text = re.sub(r"<h\d(.*?)>", '\n## ', text)
     text = re.sub(r"</h\d>", '\n', text)
+    text = text.replace('<div class="complement">', "\n")
     text = text.replace('</div>', "\n")
     text = strip_html(text)
     if len(text) > 4096:
