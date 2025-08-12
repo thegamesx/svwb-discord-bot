@@ -111,7 +111,10 @@ def make_card_dict_from_data(card_json, card_id):
             if not is_token:
                 for related_card_id in card_json["cards"][card_id]['related_card_ids']:
                     # Hay que especificar que es un token en la recursion, asi evitamos una recursion infinita
-                    related_cards.append(make_card_dict_from_data(card_json, related_card_id))
+                    # También revisamos que, si la carta está relacionada consigo misma, no buscar la información de
+                    # vuelta, y así evitar otra recursión infinita.
+                    if not int(card_id) == related_card_id:
+                        related_cards.append(make_card_dict_from_data(card_json, related_card_id))
     trait_text = ""
     for trait in card_json["card_details"][card_id]["common"]["tribes"]:
         if trait != 0:
